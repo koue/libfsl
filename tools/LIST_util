@@ -1,0 +1,3 @@
+void *fossil_malloc(size_t n)
+void fossil_free(void *p)
+void *fossil_realloc(void *p, size_t n)

@@ -1,0 +1,6 @@
+int hash_digits(int bForUrl)
+int et_getdigit(long double *val, int *cnt)
+int StrNLen32(const char *z, int N)
+int vxprintf(
+char *mprintf(const char *zFormat, ...)
+char *vmprintf(const char *zFormat, va_list ap)
