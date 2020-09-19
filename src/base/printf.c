@@ -53,11 +53,11 @@ int hash_digits(int bForUrl){
   static int nDigitHuman = 0;
   static int nDigitUrl = 0;
   if( nDigitHuman==0 ){
-#if 0 /* libcez */
+#if 0 /* libfsl */
     nDigitHuman = db_get_int("hash-digits", FOSSIL_HASH_DIGITS);
 #else
     nDigitHuman = 10;
-#endif /* libcez */
+#endif /* libfsl */
     if( nDigitHuman < 6 ) nDigitHuman = 6;
     if( nDigitHuman > 40 ) nDigitHuman = 40;
     nDigitUrl = nDigitHuman + 6;
@@ -165,11 +165,11 @@ static const et_info fmtinfo[] = {
   {  'p', 16, 0, etPOINTER,    0,  1 },
   {  '/',  0, 0, etPATH,       0,  0 },
 };
-#if 0 /* libcez */
+#if 0 /* libfsl */
 #define etNINFO count(fmtinfo)
 #else
 #define etNINFO 31
-#endif /* libcez */
+#endif /* libfsl */
 
 /*
 ** "*val" is a double such that 0.1 <= *val < 10.0
@@ -637,11 +637,11 @@ int vxprintf(
         break;
       }
       case etROOT: {
-#if 0 /* libcez */
+#if 0 /* libfsl */
         bufpt = g.zTop ? g.zTop : "";
 #else
         bufpt = "";
-#endif /* libcez */
+#endif /* libfsl */
         length = (int)strlen(bufpt);
         break;
       }
@@ -725,7 +725,7 @@ int vxprintf(
         if( precision>=0 && precision<length ) length = precision;
         break;
       }
-#if 0 /* libcez */
+#if 0 /* libfsl */
       case etHTMLIZE: {
         int limit = flag_alternateform ? va_arg(ap,int) : -1;
         char *zMem = va_arg(ap,char*);
@@ -792,7 +792,7 @@ int vxprintf(
         length = width = 0;
         break;
       }
-#endif /* libcez */
+#endif /* libfsl */
       case etERROR:
         buf[0] = '%';
         buf[1] = c;

@@ -65,6 +65,7 @@ main(void)
 	db_multi_exec("INSERT INTO tbl_test(name) VALUES (%Q)", "testuser2");
 	db_multi_exec("INSERT INTO tbl_test(name) VALUES (%Q)", "testuser3");
 	/* get text */
+	assert(db_text(0, "SELECT name FROM tbl_test WHERE name='testuser0'"));
 	assert(db_text(0, "SELECT name FROM tbl_test WHERE name='testuser1'"));
 	/* get int */
 	assert(db_int(0, "SELECT id FROM tbl_test WHERE name='testuser2'"));

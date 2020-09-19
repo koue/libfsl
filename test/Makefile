@@ -29,15 +29,21 @@ MAN=
 MK_DEBUG_FILES=	no
 MAKEOBJDIR= .
 
+.ifdef VALGRIND
+VALGRIND_CMD?=	valgrind -q --tool=memcheck --leak-check=yes --num-callers=20
+.else
+VALGRIND_CMD?=
+.endif
+
 # keep this empty otherwise installation fails
 install:
 
 test:
-	./blob_test
+	${VALGRIND_CMD} ./blob_test
 .ifndef NOSQLITE
-	./cson_test
-	./db_test
+	${VALGRIND_CMD} ./cson_test
+	${VALGRIND_CMD} ./db_test
 .endif
-	./printf_test
+	${VALGRIND_CMD} ./printf_test
 
 .include <bsd.progs.mk>

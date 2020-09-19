@@ -42,7 +42,7 @@ main(void)
 	blob_append_char(&mystr, 88);
 	assert(blob_size(&mystr) == 1);
 	assert(strcmp(blob_str(&mystr), "X") == 0);
-	blob_zero(&mystr);
+	blob_reset(&mystr);
 	assert(blob_size(&mystr) == 0);
 	blob_append(&mystr, teststr, strlen(teststr));
 	assert(blob_size(&mystr) == 16);
@@ -57,11 +57,11 @@ main(void)
 	blob_resize(&mystr, 10);
 	assert(blob_size(&mystr) == 10);
 	assert(strlen(blob_str(&mystr)) == 0);
-	blob_zero(&mystr);
+	blob_reset(&mystr);
 	blob_append(&mystr, teststr, strlen(teststr));
 	blob_resize(&mystr, 5);
 	assert(strcmp(blob_str(&mystr), "black") == 0);
-	blob_zero(&mystr);
+	blob_reset(&mystr);
 	assert(blob_size(&mystr) == 0);
 
 	return (0);

@@ -1,3 +1,8 @@
+20200920:
+
+  Add 'make -DVALGRIND test' to run tests with valgrind.
+
 20200914:
 
-  Initial commit. Moved from libcez. Renamed from cez_fossil to fsl.
+  Initial commit. Moved from libcez. Renamed from cez_fossil to fsl. Upgrade to
+  fossil-scm 2.12.1.

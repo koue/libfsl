@@ -50,11 +50,11 @@ static void blobReallocStatic(Blob *pBlob, unsigned int newSize){
 static void blob_panic(void){
   static const char zErrMsg[] = "out of memory\n";
   fputs(zErrMsg, stderr);
-#if 0 /* libcez */
+#if 0 /* libfsl */
   fossil_exit(1);
 #else
   exit(1);
-#endif /* libcez */
+#endif /* libfsl */
 }
 
 /*

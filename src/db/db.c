@@ -70,7 +70,7 @@ char *db_text(const char *zDefault, const char *zSql, ...){
   return z;
 }
 
-#if 0 /* libcez */
+#if 0 /* libfsl */
 /*
 ** Print warnings if a query is inefficient.
 */
@@ -92,7 +92,7 @@ static void db_stats(Stmt *pStmt){
   pStmt->nStep = 0;
 #endif
 }
-#endif /* libcez */
+#endif /* libfsl */
 
 /*
 ** Call this routine when a database error occurs.
@@ -103,7 +103,7 @@ static void db_err(const char *zFormat, ...){
   va_start(ap, zFormat);
   z = vmprintf(zFormat, ap);
   va_end(ap);
-#if 0 /* libcez */
+#if 0 /* libfsl */
 #ifdef FOSSIL_ENABLE_JSON
   if( g.json.isJsonMode!=0 ){
     /*
@@ -127,7 +127,7 @@ static void db_err(const char *zFormat, ...){
   free(z);
   db_close(1);
   exit(1);
-#endif /* libcez */
+#endif /* libfsl */
 }
 
 /*
@@ -157,9 +157,9 @@ int db_finalize(Stmt *pStmt){
   }
   pStmt->pNext = 0;
   pStmt->pPrev = 0;
-#if 0 /* libcez */
+#if 0 /* libfsl */
   if( g.fSqlStats ){ db_stats(pStmt); }
-#endif /* libcez */
+#endif /* libfsl */
   blob_reset(&pStmt->sql);
   rc = sqlite3_finalize(pStmt->pStmt);
   db_check_result(rc, pStmt);
@@ -177,7 +177,7 @@ void db_close(int reportErrors){
   sqlite3_stmt *pStmt;
   if( g.db==0 ) return;
   sqlite3_set_authorizer(g.db, 0, 0);
-#if 0 /* libcez */
+#if 0 /* libfsl */
   if( g.fSqlStats ){
     int cur, hiwtr;
     sqlite3_db_status(g.db, SQLITE_DBSTATUS_LOOKASIDE_USED, &cur, &hiwtr, 0);
@@ -204,19 +204,19 @@ void db_close(int reportErrors){
     fprintf(stderr, "-- PCACHE_OVFLOW          %10d %10d\n", cur, hiwtr);
     fprintf(stderr, "-- prepared statements    %10d\n", db.nPrepare);
   }
-#endif /* libcez */
+#endif /* libfsl */
   while( db.pAllStmt ){
     db_finalize(db.pAllStmt);
   }
   if( db.nBegin ){
     if( reportErrors ){
-#if 0 /* libcez */
+#if 0 /* libfsl */
       fossil_warning("Transaction started at %s:%d never commits",
                      db.zStartFile, db.iStartLine);
 #else
       fprintf(stderr, "Transaction started at %s:%d never commits\n",
                      db.zStartFile, db.iStartLine);
-#endif /* libcez */
+#endif /* libfsl */
     }
     db_end_transaction(1);
   }
@@ -225,9 +225,9 @@ void db_close(int reportErrors){
   g.dbIgnoreErrors++; /* Stop "database locked" warnings */
   sqlite3_exec(g.db, "PRAGMA optimize", 0, 0, 0);
   g.dbIgnoreErrors--;
-#if 0 /* libcez */
+#if 0 /* libfsl */
   db_close_config();
-#endif /* libcez */
+#endif /* libfsl */
 
   /* If the localdb has a lot of unused free space,
   ** then VACUUM it as we shut down.
@@ -244,27 +244,27 @@ void db_close(int reportErrors){
     int rc;
     sqlite3_wal_checkpoint(g.db, 0);
     rc = sqlite3_close(g.db);
-#if 0 /* libcez */
+#if 0 /* libfsl */
     if( g.fSqlTrace ) fossil_trace("-- sqlite3_close(%d)\n", rc);
-#endif /* libcez */
+#endif /* libfsl */
     if( rc==SQLITE_BUSY && reportErrors ){
       while( (pStmt = sqlite3_next_stmt(g.db, pStmt))!=0 ){
-#if 0 /* libcez */
+#if 0 /* libfsl */
         fossil_warning("unfinalized SQL statement: [%s]", sqlite3_sql(pStmt));
 #else
         fprintf(stderr, "unfinalized SQL statement: [%s]\n", sqlite3_sql(pStmt));
-#endif /* libcez */
+#endif /* libfsl */
       }
     }
     g.db = 0;
   }
-#if 0 /* libcez */
+#if 0 /* libfsl */
   g.repositoryOpen = 0;
   g.localOpen = 0;
   assert( g.dbConfig==0 );
   assert( g.zConfigDbName==0 );
   backoffice_run_if_needed();
-#endif /* libcez */
+#endif /* libfsl */
 }
 
 /*
@@ -315,18 +315,18 @@ int db_step(Stmt *pStmt){
 void db_end_transaction(int rollbackFlag){
   if( g.db==0 ) return;
   if( db.nBegin<=0 ){
-#if 0 /* libcez */
+#if 0 /* libfsl */
     fossil_warning("Extra call to db_end_transaction");
 #else
     fprintf(stderr, "Extra call to db_end_transaction\n");
-#endif /* libcez */
+#endif /* libfsl */
     return;
   }
   if( rollbackFlag ){
     db.doRollback = 1;
-#if 0 /* libcez */
+#if 0 /* libfsl */
     if( g.fSqlTrace ) fossil_trace("-- ROLLBACK by request\n");
-#endif /* libcez */
+#endif /* libfsl */
   }
   db.nBegin--;
   if( db.nBegin==0 ){
@@ -339,17 +339,17 @@ void db_end_transaction(int rollbackFlag){
         sqlite3_free(db.azBeforeCommit[i]);
         i++;
       }
-#if 0 /* libcez */
+#if 0 /* libfsl */
       leaf_do_pending_checks();
-#endif /* libcez */
+#endif /* libfsl */
     }
     for(i=0; db.doRollback==0 && i<db.nCommitHook; i++){
       int rc = db.aHook[i].xHook();
       if( rc ){
         db.doRollback = 1;
-#if 0 /* libcez */
+#if 0 /* libfsl */
         if( g.fSqlTrace ) fossil_trace("-- ROLLBACK due to aHook[%d]\n", i);
-#endif /* libcez */
+#endif /* libfsl */
       }
     }
     while( db.pAllStmt ){
@@ -446,11 +446,11 @@ int db_database_slot(const char *zLabel){
   rc = db_prepare_ignore_error(&q, "PRAGMA database_list");
   if( rc!=SQLITE_OK ) return iSlot;
   while( db_step(&q)==SQLITE_ROW ){
-#if 0 /* libcez */
+#if 0 /* libfsl */
     if( fossil_strcmp(db_column_text(&q,1),zLabel)==0 ){
 #else
     if( strcmp(db_column_text(&q,1),zLabel)==0 ){
-#endif /* libcez */
+#endif /* libfsl */
       iSlot = db_column_int(&q, 0);
       break;
     }
@@ -512,20 +512,20 @@ void db_init_database(
   const char *zSql;
   va_list ap;
 
-#if 0 /* libcez */
+#if 0 /* libfsl */
   xdb = db_open(zFileName ? zFileName : ":memory:");
 #else
   if (sqlite3_open(zFileName, &xdb) != SQLITE_OK) {
     fprintf(stderr, "Cannot open database file: %s\n", zFileName);
     exit(1);
   }
-#endif /* libcez */
+#endif /* libfsl */
   sqlite3_exec(xdb, "BEGIN EXCLUSIVE", 0, 0, 0);
-#if 0 /* libcez */
+#if 0 /* libfsl */
   if( db.xAuth ){
     sqlite3_set_authorizer(xdb, db.xAuth, db.pAuthArg);
   }
-#endif /* libcez */
+#endif /* libfsl */
   rc = sqlite3_exec(xdb, zSchema, 0, 0, 0);
   if( rc!=SQLITE_OK ){
     db_err("%s", sqlite3_errmsg(xdb));
@@ -539,7 +539,7 @@ void db_init_database(
   }
   va_end(ap);
   sqlite3_exec(xdb, "COMMIT", 0, 0, 0);
-#if 0 /* libcez */
+#if 0 /* libfsl */
   if( zFileName || g.db!=0 ){
     sqlite3_close(xdb);
   }else{
@@ -547,7 +547,7 @@ void db_init_database(
   }
 #else
   sqlite3_close(xdb);
-#endif /* libcez */
+#endif /* libfsl */
 }
 
 /*
@@ -578,7 +578,7 @@ int db_sql_trace(unsigned m, void *notUsed, void *pP, void *pX){
   }
   zSql = sqlite3_expanded_sql(pStmt);
   n = (int)strlen(zSql);
-#if 0 /* libcez */
+#if 0 /* libfsl */
   fossil_trace("%s%s%s", zSql, (n>0 && zSql[n-1]==';') ? "" : ";", zEnd);
 #else
   if (g.sqltrace != NULL) {
@@ -586,7 +586,7 @@ int db_sql_trace(unsigned m, void *notUsed, void *pP, void *pX){
   } else {
     fprintf(stderr, "%s%s\n", zSql, (n>0 && zSql[n-1]==';') ? "" : ";");
   }
-#endif /* libcez */
+#endif /* libfsl */
   sqlite3_free(zSql);
   return 0;
 }
