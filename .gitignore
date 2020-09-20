@@ -2,3 +2,7 @@
 *.o
 *.a
 *_test
+tools/fossil-*
+tools/grep_function
+tools/*.c
+tools/*.h

@@ -23,15 +23,19 @@ grep:
 	done;
 
 fetch:
+.if !exists(${PACKAGE})
 	fetch $(URL)$(PACKAGE)
+.endif
 
 extract:
 	tar zxf $(PACKAGE)
 
 clean:
 	rm -rf ./$(DIR)
-	rm -f $(PACKAGE)
 	rm -f grep_function
 	for func in $(FUNCTIONS); do \
 		rm -f $${func}.[ch]; \
 	done;
+
+cleandir: clean
+	rm -f $(PACKAGE)

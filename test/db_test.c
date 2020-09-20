@@ -51,6 +51,7 @@ main(void)
 	Blob sqltrace_list = empty_blob;
 	char command[256];
 	FILE *pf;
+	char *word = NULL;
 
 	cez_test_start();
 	/* create database */
@@ -65,8 +66,11 @@ main(void)
 	db_multi_exec("INSERT INTO tbl_test(name) VALUES (%Q)", "testuser2");
 	db_multi_exec("INSERT INTO tbl_test(name) VALUES (%Q)", "testuser3");
 	/* get text */
-	assert(db_text(0, "SELECT name FROM tbl_test WHERE name='testuser0'"));
-	assert(db_text(0, "SELECT name FROM tbl_test WHERE name='testuser1'"));
+	assert(!word);
+	word = db_text(0, "SELECT name FROM tbl_test WHERE name='testuser0'");
+	free(word);
+	word = db_text(0, "SELECT name FROM tbl_test WHERE name='testuser1'");
+	free(word);
 	/* get int */
 	assert(db_int(0, "SELECT id FROM tbl_test WHERE name='testuser2'"));
 	/* multiple results */
