@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2020 Nikola Kolev <koue@chaosophia.net>
+ * Copyright (c) 2019-2021 Nikola Kolev <koue@chaosophia.net>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -61,6 +61,23 @@ main(void)
 	blob_append(&mystr, teststr, strlen(teststr));
 	blob_resize(&mystr, 5);
 	assert(strcmp(blob_str(&mystr), "black") == 0);
+	blob_reset(&mystr);
+	assert(blob_size(&mystr) == 0);
+	blob_append_sql(&mystr, "SELECT * FROM TABLE WHERE id = '%d'", 1);
+	assert(strcmp(blob_str(&mystr), "SELECT * FROM TABLE WHERE id = '1'") == 0);
+	blob_reset(&mystr);
+	assert(blob_size(&mystr) == 0);
+	blob_append_sql(&mystr, "%q", "'showme'");
+	assert(strcmp(blob_str(&mystr), "''showme''") == 0);
+	assert(strcmp(blob_sql_text(&mystr), "''showme''") == 0);
+	blob_reset(&mystr);
+	assert(blob_size(&mystr) == 0);
+	blob_append_sql(&mystr, "%q", "'showme'");
+	assert(strcmp(blob_str(&mystr), "''showme''") == 0);
+	assert(strcmp(blob_sql_text(&mystr), "''showme''") == 0);
+	blob_append_sql(&mystr, " more %s %d", "showme", 34);
+	assert(strcmp(blob_str(&mystr), "''showme'' more showme 34") == 0);
+	assert(strcmp(blob_sql_text(&mystr), "''showme'' more showme 34") == 0);
 	blob_reset(&mystr);
 	assert(blob_size(&mystr) == 0);
 

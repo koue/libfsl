@@ -1,5 +1,5 @@
 /*
-** Copyright (c) 2017-2020 Nikola Kolev <koue@chaosophia.net>
+** Copyright (c) 2017-2021 Nikola Kolev <koue@chaosophia.net>
 ** Copyright (c) 2006 D. Richard Hipp
 **
 ** This program is free software; you can redistribute it and/or
@@ -132,6 +132,7 @@ typedef struct et_info {   /* Information about each format field */
 */
 static const char aDigits[] = "0123456789ABCDEF0123456789abcdef";
 static const char aPrefix[] = "-x0\000X0";
+static const char fmtchr[] = "dsgzqQbBWhRtTwFSjcouxXfeEGin%p/$";
 static const et_info fmtinfo[] = {
   {  'd', 10, 1, etRADIX,      0,  0 },
   {  's',  0, 4, etSTRING,     0,  0 },
@@ -270,18 +271,20 @@ int vxprintf(
   etByte flag_rtz;           /* True if trailing zeros should be removed */
   etByte flag_exp;           /* True to force display of the exponent */
   int nsd;                   /* Number of significant digits returned */
+  char *zFmtLookup;
 
   count = length = 0;
   bufpt = 0;
   for(; (c=(*fmt))!=0; ++fmt){
     if( c!='%' ){
-      int amt;
       bufpt = (char *)fmt;
-      amt = 1;
-      while( (c=(*++fmt))!='%' && c!=0 ) amt++;
-      blob_append(pBlob,bufpt,amt);
-      count += amt;
-      if( c==0 ) break;
+#if HAVE_STRCHRNUL
+      fmt = strchrnul(fmt, '%');
+#else
+      do{ fmt++; }while( *fmt && *fmt != '%' );
+#endif
+      blob_append(pBlob, bufpt, (int)(fmt - bufpt));
+      if( *fmt==0 ) break;
     }
     if( (c=(*++fmt))==0 ){
       errorflag = 1;
@@ -354,14 +357,13 @@ int vxprintf(
       flag_long = flag_longlong = 0;
     }
     /* Fetch the info entry for the field */
-    infop = 0;
-    xtype = etERROR;
-    for(idx=0; idx<etNINFO; idx++){
-      if( c==fmtinfo[idx].fmttype ){
-        infop = &fmtinfo[idx];
-        xtype = infop->type;
-        break;
-      }
+    zFmtLookup = strchr(fmtchr,c);
+    if( zFmtLookup ){
+      infop = &fmtinfo[zFmtLookup-fmtchr];
+      xtype = infop->type;
+    }else{
+      infop = 0;
+      xtype = etERROR;
     }
     zExtra = 0;
 

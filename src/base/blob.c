@@ -1,5 +1,5 @@
 /*
-** Copyright (c) 2017-2020 Nikola Kolev <koue@chaosophia.net>
+** Copyright (c) 2017-2021 Nikola Kolev <koue@chaosophia.net>
 ** Copyright (c) 2006 D. Richard Hipp
 **
 ** This program is free software; you can redistribute it and/or
@@ -261,5 +261,33 @@ void blob_init(Blob *pBlob, const char *zData, int size){
     pBlob->blobFlags = 0;
     pBlob->xRealloc = blobReallocStatic;
   }
+}
+
+/*
+** Do printf-style string rendering and append the results to a blob.
+**
+** The blob_appendf() version sets the BLOBFLAG_NotSQL bit in Blob.blobFlags
+** whereas blob_append_sql() does not.
+*/
+void blob_append_sql(Blob *pBlob, const char *zFormat, ...){
+  if( pBlob ){
+    va_list ap;
+    va_start(ap, zFormat);
+    vxprintf(pBlob, zFormat, ap);
+    va_end(ap);
+  }
+}
+
+/*
+** Return a pointer to a null-terminated string for a blob that has
+** been created using blob_append_sql() and not blob_appendf().  If
+** text was ever added using blob_appendf() then throw an error.
+*/
+char *blob_sql_text(Blob *p){
+  blob_is_init(p);
+  if( (p->blobFlags & BLOBFLAG_NotSQL) ){
+    fossil_panic("use of blob_appendf() to construct SQL text");
+  }
+  return blob_str(p);
 }
 

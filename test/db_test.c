@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017-2020 Nikola Kolev <koue@chaosophia.net>
+ * Copyright (c) 2017-2021 Nikola Kolev <koue@chaosophia.net>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -49,6 +49,7 @@ int
 main(void)
 {
 	Blob sqltrace_list = empty_blob;
+	Blob sqlblob = empty_blob;
 	char command[256];
 	FILE *pf;
 	char *word = NULL;
@@ -78,6 +79,12 @@ main(void)
 	while(db_step(&q)==SQLITE_ROW){
 		assert(db_column_int(&q, 0));
 		assert(strlen(db_column_text(&q, 1)));
+	}
+	db_finalize(&q);
+	blob_append_sql(&sqlblob, "SELECT id FROM tbl_test");
+	db_prepare_blob(&q, &sqlblob);
+	while(db_step(&q)==SQLITE_ROW){
+		assert(db_column_int(&q, 0));
 	}
 	db_finalize(&q);
 	sqlite3_close(g.db);

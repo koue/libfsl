@@ -1,5 +1,5 @@
 /*
-** Copyright (c) 2017-2020 Nikola Kolev <koue@chaosophia.net>
+** Copyright (c) 2017-2021 Nikola Kolev <koue@chaosophia.net>
 ** Copyright (c) 2006 D. Richard Hipp
 **
 ** This program is free software; you can redistribute it and/or
@@ -87,6 +87,8 @@ struct Blob {
 
 #define BLOB_INITIALIZER  {0,0,0,0,0,blobReallocMalloc}
 
+#define BLOBFLAG_NotSQL  0x0001      /* Non-SQL text */
+
 extern const Blob empty_blob;
 
 char *blob_str(Blob *p);
@@ -101,6 +103,8 @@ void blob_zero(Blob *pBlob);
 void blob_vappendf(Blob *pBlob, const char *zFormat, va_list ap);
 void blob_reset(Blob *pBlob);
 void blob_init(Blob *pBlob, const char *zData, int size);
+void blob_append_sql(Blob *pBlob, const char *zFormat, ...);
+char *blob_sql_text(Blob *p);
 
 /*
 ** UTIL
@@ -109,5 +113,7 @@ void fossil_panic(const char *c);
 void *fossil_malloc(size_t n);
 void fossil_free(void *p);
 void *fossil_realloc(void *p, size_t n);
+int fossil_isspace(char c);
+int fossil_all_whitespace(const char *z);
 
 #endif

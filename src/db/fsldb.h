@@ -1,5 +1,5 @@
 /*
-** Copyright (c) 2019-2020 Nikola Kolev <koue@chaosophia.net>
+** Copyright (c) 2019-2021 Nikola Kolev <koue@chaosophia.net>
 ** Copyright (c) 2006 D. Richard Hipp
 **
 ** This program is free software; you can redistribute it and/or
@@ -71,5 +71,6 @@ int db_prepare(Stmt *pStmt, const char *zFormat, ...);
 void db_init_database(const char *zFileName, const char *zSchema, ...);
 int db_sql_trace(unsigned m, void *notUsed, void *pP, void *pX);
 int db_exec_sql(const char *z);
+int db_prepare_blob(Stmt *pStmt, Blob *pSql);
 
 #endif

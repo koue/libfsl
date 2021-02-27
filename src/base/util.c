@@ -1,5 +1,5 @@
 /*
-** Copyright (c) 2019-2020 Nikola Kolev <koue@chaosophia.net>
+** Copyright (c) 2019-2021 Nikola Kolev <koue@chaosophia.net>
 ** Copyright (c) 2006 D. Richard Hipp
 **
 ** This program is free software; you can redistribute it and/or
@@ -54,3 +54,20 @@ void *fossil_realloc(void *p, size_t n){
   return p;
 }
 
+/*
+** We find that the built-in isspace() function does not work for
+** some international character sets.  So here is a substitute.
+*/
+int fossil_isspace(char c){
+  return c==' ' || (c<='\r' && c>='\t');
+}
+
+/*
+** Return true if the input string is NULL or all whitespace.
+** Return false if the input string contains text.
+*/
+int fossil_all_whitespace(const char *z){
+  if( z==0 ) return 1;
+  while( fossil_isspace(z[0]) ){ z++; }
+  return z[0]==0;
+}

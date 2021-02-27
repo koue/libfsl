@@ -1,5 +1,5 @@
 /*
-** Copyright (c) 2017-2020 Nikola Kolev <koue@chaosophia.net>
+** Copyright (c) 2017-2021 Nikola Kolev <koue@chaosophia.net>
 ** Copyright (c) 2006 D. Richard Hipp
 **
 ** This program is free software; you can redistribute it and/or
@@ -96,6 +96,7 @@ static void db_stats(Stmt *pStmt){
 
 /*
 ** Call this routine when a database error occurs.
+** This routine throws a fatal error.  It does not return.
 */
 static void db_err(const char *zFormat, ...){
   va_list ap;
@@ -236,7 +237,13 @@ void db_close(int reportErrors){
     int nFree = db_int(0, "PRAGMA localdb.freelist_count");
     int nTotal = db_int(0, "PRAGMA localdb.page_count");
     if( nFree>nTotal/4 ){
+#if 0 /* libfsl */
+      db_unprotect(PROTECT_ALL);
+#endif /* libfsl */
       db_multi_exec("VACUUM localdb;");
+#if 0 /* libfsl */
+      db_protect_pop();
+#endif /* libfsl */
     }
   }
 
@@ -261,6 +268,7 @@ void db_close(int reportErrors){
 #if 0 /* libfsl */
   g.repositoryOpen = 0;
   g.localOpen = 0;
+  db.bProtectTriggers = 0;
   assert( g.dbConfig==0 );
   assert( g.zConfigDbName==0 );
   backoffice_run_if_needed();
@@ -276,6 +284,7 @@ int db_vprepare(Stmt *pStmt, int flags, const char *zFormat, va_list ap){
   int rc;
   int prepFlags = 0;
   char *zSql;
+  const char *zExtra = 0;
   blob_zero(&pStmt->sql);
   blob_vappendf(&pStmt->sql, zFormat, ap);
   va_end(ap);
@@ -284,9 +293,11 @@ int db_vprepare(Stmt *pStmt, int flags, const char *zFormat, va_list ap){
   if( flags & DB_PREPARE_PERSISTENT ){
     prepFlags = SQLITE_PREPARE_PERSISTENT;
   }
-  rc = sqlite3_prepare_v3(g.db, zSql, -1, prepFlags, &pStmt->pStmt, 0);
+  rc = sqlite3_prepare_v3(g.db, zSql, -1, prepFlags, &pStmt->pStmt, &zExtra);
   if( rc!=0 && (flags & DB_PREPARE_IGNORE_ERROR)==0 ){
     db_err("%s\n%s", sqlite3_errmsg(g.db), zSql);
+  }else if( zExtra && !fossil_all_whitespace(zExtra) ){
+    db_err("surplus text follows SQL: \"%s\"", zExtra);
   }
   pStmt->pNext = db.pAllStmt;
   pStmt->pPrev = 0;
@@ -333,6 +344,9 @@ void db_end_transaction(int rollbackFlag){
     int i;
     if( db.doRollback==0 && db.nPriorChanges<sqlite3_total_changes(g.db) ){
       i = 0;
+#if 0 /* libfsl */
+      db_protect_only(PROTECT_SENSITIVE);
+#endif /* libfsl */
       while( db.nBeforeCommit ){
         db.nBeforeCommit--;
         sqlite3_exec(g.db, db.azBeforeCommit[i], 0, 0, 0);
@@ -341,6 +355,7 @@ void db_end_transaction(int rollbackFlag){
       }
 #if 0 /* libfsl */
       leaf_do_pending_checks();
+      db_protect_pop();
 #endif /* libfsl */
     }
     for(i=0; db.doRollback==0 && i<db.nCommitHook; i++){
@@ -558,7 +573,7 @@ int db_sql_trace(unsigned m, void *notUsed, void *pP, void *pX){
   char *zSql;
   int n;
   const char *zArg = (const char*)pX;
-  char zEnd[40];
+  char zEnd[100];
   if( m & SQLITE_TRACE_CLOSE ){
     /* If we are tracking closes, that means we want to clean up static
     ** prepared statements. */
@@ -571,7 +586,10 @@ int db_sql_trace(unsigned m, void *notUsed, void *pP, void *pX){
   if( m & SQLITE_TRACE_PROFILE ){
     sqlite3_int64 nNano = *(sqlite3_int64*)pX;
     double rMillisec = 0.000001 * nNano;
-    sqlite3_snprintf(sizeof(zEnd),zEnd," /* %.3fms */\n", rMillisec);
+    int nRun = sqlite3_stmt_status(pStmt, SQLITE_STMTSTATUS_RUN, 0);
+    int nVmStep = sqlite3_stmt_status(pStmt, SQLITE_STMTSTATUS_VM_STEP, 1);
+    sqlite3_snprintf(sizeof(zEnd),zEnd," /* %.3fms, %r run, %d vm-steps */\n",
+        rMillisec, nRun, nVmStep);
   }else{
     zEnd[0] = '\n';
     zEnd[1] = 0;
@@ -613,6 +631,27 @@ int db_exec_sql(const char *z){
     }
     z = zEnd;
   }
+  return rc;
+}
+
+
+/* Prepare a statement using text placed inside a Blob
+** using blob_append_sql().
+*/
+int db_prepare_blob(Stmt *pStmt, Blob *pSql){
+  int rc;
+  char *zSql;
+  pStmt->sql = *pSql;
+  blob_init(pSql, 0, 0);
+  zSql = blob_sql_text(&pStmt->sql);
+  db.nPrepare++;
+  rc = sqlite3_prepare_v3(g.db, zSql, -1, 0, &pStmt->pStmt, 0);
+  if( rc!=0 ){
+    db_err("%s\n%s", sqlite3_errmsg(g.db), zSql);
+  }
+  pStmt->pNext = pStmt->pPrev = 0;
+  pStmt->nStep = 0;
+  pStmt->rc = rc;
   return rc;
 }
 
