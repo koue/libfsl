@@ -1,3 +1,8 @@
+20230515:
+
+  Use FreeBSD private SQLite3 library by default. Use 'make -DNOPRIVATE' to use
+  SQLite3 from ports.
+
 20210227:
 
   Upgrade to fossil-scm 2.14. Add blob_sql_text(), blob_append_sql() and

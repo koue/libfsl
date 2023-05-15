@@ -16,13 +16,22 @@ LDADD.printf_test=	-lfslbase
 PROGS+=		cson_test \
 		db_test
 CFLAGS+=	-I${.CURDIR}/../src/cson \
-		-I${.CURDIR}/../src/db \
-		-I${LOCALBASE}/include
+		-I${.CURDIR}/../src/db
 LDFLAGS+=	-L${.CURDIR}/../src/cson \
-		-L${.CURDIR}/../src/db \
-		-L${LOCALBASE}/lib
-LDADD.cson_test=-lfslbase -lfslcson -lsqlite3
-LDADD.db_test=	-lfslbase -lfsldb -lsqlite3
+		-L${.CURDIR}/../src/db
+LDADD.cson_test=-lfslbase -lfslcson
+LDADD.db_test=	-lfslbase -lfsldb
+.  ifndef NOPRIVATE
+CFLAGS+=	-I/usr/include/private/sqlite3
+LDFLAGS+=	-L/usr/lib
+LDADD.cson_test+=	-lprivatesqlite3
+LDADD.db_test+=	-lprivatesqlite3
+.  else
+CFLAGS+=	-I${LOCALBASE}/include
+LDFLAGS+=	-L${LOCALBASE}/lib
+LDADD.cson_test+=	-lsqlite3
+LDADD.db_test+=	-lsqlite3
+.  endif
 .endif
 
 MAN=
