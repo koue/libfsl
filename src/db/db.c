@@ -1,5 +1,5 @@
 /*
-** Copyright (c) 2017-2021 Nikola Kolev <koue@chaosophia.net>
+** Copyright (c) 2017-2025 Nikola Kolev <koue@chaosophia.net>
 ** Copyright (c) 2006 D. Richard Hipp
 **
 ** This program is free software; you can redistribute it and/or
@@ -60,11 +60,9 @@ char *db_text(const char *zDefault, const char *zSql, ...){
   db_vprepare(&s, 0, zSql, ap);
   va_end(ap);
   if( db_step(&s)==SQLITE_ROW ){
-    z = mprintf("%s", sqlite3_column_text(s.pStmt, 0));
-  }else if( zDefault ){
-    z = mprintf("%s", zDefault);
+    z = fossil_strdup_nn((const char*)sqlite3_column_text(s.pStmt, 0));
   }else{
-    z = 0;
+    z = fossil_strdup(zDefault);
   }
   db_finalize(&s);
   return z;
@@ -290,6 +288,9 @@ int db_vprepare(Stmt *pStmt, int flags, const char *zFormat, va_list ap){
   va_end(ap);
   zSql = blob_str(&pStmt->sql);
   db.nPrepare++;
+#if 0 /* libfsl */
+  db_append_dml(zSql);
+#endif /* libfsl */
   if( flags & DB_PREPARE_PERSISTENT ){
     prepFlags = SQLITE_PREPARE_PERSISTENT;
   }
@@ -459,15 +460,16 @@ int db_database_slot(const char *zLabel){
   Stmt q;
   if( g.db==0 ) return iSlot;
   rc = db_prepare_ignore_error(&q, "PRAGMA database_list");
-  if( rc!=SQLITE_OK ) return iSlot;
-  while( db_step(&q)==SQLITE_ROW ){
+  if( rc==SQLITE_OK ){
+    while( db_step(&q)==SQLITE_ROW ){
 #if 0 /* libfsl */
-    if( fossil_strcmp(db_column_text(&q,1),zLabel)==0 ){
+      if( fossil_strcmp(db_column_text(&q,1),zLabel)==0 ){
 #else
-    if( strcmp(db_column_text(&q,1),zLabel)==0 ){
+      if( strcmp(db_column_text(&q,1),zLabel)==0 ){
 #endif /* libfsl */
-      iSlot = db_column_int(&q, 0);
-      break;
+        iSlot = db_column_int(&q, 0);
+        break;
+      }
     }
   }
   db_finalize(&q);
@@ -536,11 +538,6 @@ void db_init_database(
   }
 #endif /* libfsl */
   sqlite3_exec(xdb, "BEGIN EXCLUSIVE", 0, 0, 0);
-#if 0 /* libfsl */
-  if( db.xAuth ){
-    sqlite3_set_authorizer(xdb, db.xAuth, db.pAuthArg);
-  }
-#endif /* libfsl */
   rc = sqlite3_exec(xdb, zSchema, 0, 0, 0);
   if( rc!=SQLITE_OK ){
     db_err("%s", sqlite3_errmsg(xdb));
@@ -609,7 +606,6 @@ int db_sql_trace(unsigned m, void *notUsed, void *pP, void *pX){
   return 0;
 }
 
-
 /*
 ** Execute multiple SQL statements.  The input text is executed
 ** directly without any formatting.
@@ -625,6 +621,9 @@ int db_exec_sql(const char *z){
       db_err("%s: {%s}", sqlite3_errmsg(g.db), z);
     }else if( pStmt ){
       db.nPrepare++;
+#if 0 /* libfsl */
+      db_append_dml(sqlite3_sql(pStmt));
+#endif /* libfsl */
       while( sqlite3_step(pStmt)==SQLITE_ROW ){}
       rc = sqlite3_finalize(pStmt);
       if( rc ) db_err("%s: {%.*s}", sqlite3_errmsg(g.db), (int)(zEnd-z), z);
@@ -633,7 +632,6 @@ int db_exec_sql(const char *z){
   }
   return rc;
 }
-
 
 /* Prepare a statement using text placed inside a Blob
 ** using blob_append_sql().

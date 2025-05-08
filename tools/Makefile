@@ -1,7 +1,7 @@
-VERSION=2.14
-URL=https://www.fossil-scm.org/home/uv/
+VERSION=2.26
+URL=https://www.fossil-scm.org/home/tarball/
 PACKAGE=fossil-src-$(VERSION).tar.gz
-DIR=fossil-$(VERSION)
+DIR=fossil-src-$(VERSION)
 FUNCTIONS=blob db printf util
 
 all: compile fetch extract grep
@@ -14,6 +14,10 @@ grep:
 		cat /dev/null > $${func}.h; \
 		cat /dev/null > $${func}.c; \
 		Y=license; \
+                if [ "$${func}" == "printf" ]; then \
+			head -n 244 $(DIR)/src/printf.c > printf.c; \
+			Y=; \
+		fi; \
 		while read line; do \
 			echo "$${line};" >> $${func}.h; \
 			./grep_function "$${line}" $(DIR)/src/$${func}.c $${Y} >> $${func}.c; \

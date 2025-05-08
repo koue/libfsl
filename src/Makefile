@@ -1,8 +1,7 @@
 SUBDIR= base
 
 .ifndef NOSQLITE
-# fossil cson requires sqlite
-SUBDIR+=	cson db
+SUBDIR+=	db
 .endif
 
 .include <bsd.subdir.mk>

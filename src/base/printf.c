@@ -1,5 +1,5 @@
 /*
-** Copyright (c) 2017-2021 Nikola Kolev <koue@chaosophia.net>
+** Copyright (c) 2017-2025 Nikola Kolev <koue@chaosophia.net>
 ** Copyright (c) 2006 D. Richard Hipp
 **
 ** This program is free software; you can redistribute it and/or
@@ -19,11 +19,17 @@
 ** This file contains implementions of routines for formatting output
 ** (ex: mprintf()) and for output to the console.
 */
+#if 0 /* libfsl */
+#include "config.h"
+#include "printf.h"
+#if defined(_WIN32)
+#   include <io.h>
+#   include <fcntl.h>
+#endif
+#include <time.h>
+#endif /* libfsl */
 
 #include "fslbase.h"
-
-typedef long long int i64;
-typedef unsigned long long int u64;
 
 /* Two custom conversions are used to show a prefix of artifact hashes:
 **
@@ -35,7 +41,7 @@ typedef unsigned long long int u64;
 ** be overridden using the hash-digits setting.  FOSSIL_HASH_DIGITS_URL
 ** is the minimum number of digits to be used in URLs.  The number used
 ** will always be at least 6 more than the number used for human output,
-** or 40 if the number of digits in human output is 34 or more.
+** or HNAME_MAX, whichever is least.
 */
 #ifndef FOSSIL_HASH_DIGITS
 # define FOSSIL_HASH_DIGITS 10       /* For %S (human display) */
@@ -43,6 +49,8 @@ typedef unsigned long long int u64;
 #ifndef FOSSIL_HASH_DIGITS_URL
 # define FOSSIL_HASH_DIGITS_URL 16   /* For %!S (embedded in URLs) */
 #endif
+
+#define HNAME_MAX  64     /* Length for SHA3-256 */
 
 /*
 ** Return the number of artifact hash digits to display.  The number is for
@@ -59,13 +67,22 @@ int hash_digits(int bForUrl){
     nDigitHuman = 10;
 #endif /* libfsl */
     if( nDigitHuman < 6 ) nDigitHuman = 6;
-    if( nDigitHuman > 40 ) nDigitHuman = 40;
+    if( nDigitHuman > HNAME_MAX ) nDigitHuman = HNAME_MAX;
     nDigitUrl = nDigitHuman + 6;
     if( nDigitUrl < FOSSIL_HASH_DIGITS_URL ) nDigitUrl = FOSSIL_HASH_DIGITS_URL;
-    if( nDigitUrl > 40 ) nDigitUrl = 40;
+    if( nDigitUrl > HNAME_MAX ) nDigitUrl = HNAME_MAX;
   }
   return bForUrl ? nDigitUrl : nDigitHuman;
 }
+
+#if 0 /* libfsl */
+/*
+** Return the number of characters in a %S output.
+*/
+int length_of_S_display(void){
+  return hash_digits(0);
+}
+#endif /* libfsl */
 
 /*
 ** Conversion types fall into various categories as defined by the
@@ -95,9 +112,15 @@ int hash_digits(int bForUrl){
 #define etFOSSILIZE  20 /* The fossil header encoding format. */
 #define etPATH       21 /* Path type */
 #define etWIKISTR    22 /* Timeline comment text rendered from a char*: %W */
-#define etSTRINGID   23 /* String with length limit for a UUID prefix: %S */
+#define etSTRINGID   23 /* String with length limit for a hash prefix: %S */
 #define etROOT       24 /* String value of g.zTop: %R */
-#define etJSONSTR    25 /* String encoded as a JSON string literal: %j */
+#define etJSONSTR    25 /* String encoded as a JSON string literal: %j
+                           Use %!j to include double-quotes around it. */
+#define etSHELLESC   26 /* Escape a filename for use in a shell command: %$
+                           See blob_append_escaped_arg() for details
+                           "%$"  -> adds "./" prefix if necessary.
+                           "%!$" -> omits the "./" prefix. */
+#define etHEX        27 /* Encode a string as hexadecimal */
 
 
 /*
@@ -129,10 +152,13 @@ typedef struct et_info {   /* Information about each format field */
 /*
 ** The following table is searched linearly, so it is good to put the
 ** most frequently used conversion types first.
+**
+** NB: When modifying this table is it vital that you also update the fmtchr[]
+** variable to match!!!
 */
 static const char aDigits[] = "0123456789ABCDEF0123456789abcdef";
 static const char aPrefix[] = "-x0\000X0";
-static const char fmtchr[] = "dsgzqQbBWhRtTwFSjcouxXfeEGin%p/$";
+static const char fmtchr[] = "dsgzqQbBWhRtTwFSjcouxXfeEGin%p/$H";
 static const et_info fmtinfo[] = {
   {  'd', 10, 1, etRADIX,      0,  0 },
   {  's',  0, 4, etSTRING,     0,  0 },
@@ -165,12 +191,30 @@ static const et_info fmtinfo[] = {
   {  '%',  0, 0, etPERCENT,    0,  0 },
   {  'p', 16, 0, etPOINTER,    0,  1 },
   {  '/',  0, 0, etPATH,       0,  0 },
+  {  '$',  0, 0, etSHELLESC,   0,  0 },
+  {  'H',  0, 0, etHEX,        0,  0 },
+  {  etERROR, 0,0,0,0,0}  /* Must be last */
 };
 #if 0 /* libfsl */
 #define etNINFO count(fmtinfo)
 #else
-#define etNINFO 31
+#define etNINFO 34
 #endif /* libfsl */
+
+#if 0 /* libfsl */
+/*
+** Verify that the fmtchr[] and fmtinfo[] arrays are in agreement.
+**
+** This routine is a defense against programming errors.
+*/
+void fossil_printf_selfcheck(void){
+  int i;
+  for(i=0; fmtchr[i]; i++){
+    assert( fmtchr[i]==fmtinfo[i].fmttype );
+  }
+}
+#endif /* libfsl */
+
 
 /*
 ** "*val" is a double such that 0.1 <= *val < 10.0
@@ -207,10 +251,53 @@ static int et_getdigit(long double *val, int *cnt){
 ** N bytes then return N.  If N is negative, then this routine
 ** is an alias for strlen().
 */
+#if _XOPEN_SOURCE >= 700 || _POSIX_C_SOURCE >= 200809L
+# define StrNLen32(Z,N) (int)strnlen(Z,N)
+#else
 static int StrNLen32(const char *z, int N){
   int n = 0;
   while( (N-- != 0) && *(z++)!=0 ){ n++; }
   return n;
+}
+#endif
+
+typedef long long int i64;
+
+/* True if the last character standard output cursor is setting at
+** the beginning of a blank link.  False if a \r has been to move the
+** cursor to the beginning of the line or if not at the beginning of
+** a line.
+** was a \n
+*/
+static int stdoutAtBOL = 1;
+
+/*
+** Write to standard output or standard error.
+**
+** On windows, transform the output into the current terminal encoding
+** if the output is going to the screen.  If output is redirected into
+** a file, no translation occurs. Switch output mode to binary to
+** properly process line-endings, make sure to switch the mode back to
+** text when done.
+** No translation ever occurs on unix.
+*/
+void fossil_puts(const char *z, int toStdErr, int n){
+  FILE* out = (toStdErr ? stderr : stdout);
+  if( n==0 ) return;
+  assert( toStdErr==0 || toStdErr==1 );
+  if( toStdErr==0 ) stdoutAtBOL = (z[n-1]=='\n');
+#if defined(_WIN32)
+  if( fossil_utf8_to_console(z, n, toStdErr) >= 0 ){
+    return;
+  }
+  fflush(out);
+  _setmode(_fileno(out), _O_BINARY);
+#endif
+  fwrite(z, 1, n, out);
+#if defined(_WIN32)
+  fflush(out);
+  _setmode(_fileno(out), _O_TEXT);
+#endif
 }
 
 /*
@@ -226,7 +313,7 @@ static int StrNLen32(const char *z, int N){
 **
 ** OUTPUTS:
 **          The return value is the total number of characters sent to
-**          the function "func".  Returns -1 on a error.
+**          the function "func".  Returns -1 on error.
 **
 ** Note that the order in which automatic variables are declared below
 ** seems to make a big difference in determining how fast this beast
@@ -790,7 +877,18 @@ int vxprintf(
       }
       case etSHELLESC: {
         char *zArg = va_arg(ap, char*);
-        blob_append_escaped_arg(pBlob, zArg);
+        blob_append_escaped_arg(pBlob, zArg, !flag_altform2);
+        length = width = 0;
+        break;
+      }
+      case etHEX: {
+        char *zArg = va_arg(ap, char*);
+        int szArg = (int)strlen(zArg);
+        int szBlob = blob_size(pBlob);
+        u8 *aBuf;
+        blob_resize(pBlob, szBlob+szArg*2+1);
+        aBuf = (u8*)&blob_buffer(pBlob)[szBlob];
+        encode16((const u8*)zArg, aBuf, szArg);
         length = width = 0;
         break;
       }
@@ -815,7 +913,7 @@ int vxprintf(
       nspace = width-length;
       if( nspace>0 ){
         count += nspace;
-        while( nspace>=etSPACESIZE ){
+        while( nspace>=(int)etSPACESIZE ){
           blob_append(pBlob,spaces,etSPACESIZE);
           nspace -= etSPACESIZE;
         }
@@ -831,7 +929,7 @@ int vxprintf(
       nspace = width-length;
       if( nspace>0 ){
         count += nspace;
-        while( nspace>=etSPACESIZE ){
+        while( nspace>=(int)etSPACESIZE ){
           blob_append(pBlob,spaces,etSPACESIZE);
           nspace -= etSPACESIZE;
         }

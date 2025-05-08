@@ -1,3 +1,7 @@
+char *fossil_strndup(const char *zOrig, ssize_t len)
+char *fossil_strdup(const char *zOrig)
+char *fossil_strdup_nn(const char *zOrig)
 void *fossil_malloc(size_t n)
 void fossil_free(void *p)
 void *fossil_realloc(void *p, size_t n)
+int fossil_all_whitespace(const char *z)

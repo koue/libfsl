@@ -1,3 +1,5 @@
+void blob_panic(void)
+void blob_assert_safe_size(i64 n)
 void blobReallocStatic(Blob *pBlob, unsigned int newSize)
 void blob_panic(void)
 char *blob_str(Blob *p)

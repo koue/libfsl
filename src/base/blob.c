@@ -1,5 +1,5 @@
 /*
-** Copyright (c) 2017-2021 Nikola Kolev <koue@chaosophia.net>
+** Copyright (c) 2017-2025 Nikola Kolev <koue@chaosophia.net>
 ** Copyright (c) 2006 D. Richard Hipp
 **
 ** This program is free software; you can redistribute it and/or
@@ -22,26 +22,9 @@
 
 #include "fslbase.h"
 
-typedef long long int sqlite3_int64;
-
 const Blob empty_blob = BLOB_INITIALIZER;
-
-/*
-** A reallocation function for when the initial string is in unmanaged
-** space.  Copy the string to memory obtained from malloc().
-*/
-static void blobReallocStatic(Blob *pBlob, unsigned int newSize){
-  if( newSize==0 ){
-    *pBlob = empty_blob;
-  }else{
-    char *pNew = fossil_malloc( newSize );
-    if( pBlob->nUsed>newSize ) pBlob->nUsed = newSize;
-    memcpy(pNew, pBlob->aData, pBlob->nUsed);
-    pBlob->aData = pNew;
-    pBlob->xRealloc = blobReallocMalloc;
-    pBlob->nAlloc = newSize;
-  }
-}
+typedef long long int i64;
+typedef long long int sqlite3_int64;
 
 /*
 ** This routine is called if a blob operation fails because we
@@ -55,6 +38,42 @@ static void blob_panic(void){
 #else
   exit(1);
 #endif /* libfsl */
+}
+
+/*
+** Maximum size of a Blob's managed memory. This is ~2GB, largely for
+** historical reasons.
+**
+*/
+#define MAX_BLOB_SIZE 0x7fff0000
+
+/*
+** If n >= MAX_BLOB_SIZE, calls blob_panic(),
+** else this is a no-op.
+*/
+static void blob_assert_safe_size(i64 n){
+  if( n>=(i64)MAX_BLOB_SIZE ){
+    blob_panic();
+  }
+}
+
+/*
+** A reallocation function for when the initial string is in unmanaged
+** space.  Copy the string to memory obtained from malloc().
+*/
+static void blobReallocStatic(Blob *pBlob, unsigned int newSize){
+  if( newSize==0 ){
+    *pBlob = empty_blob;
+  }else{
+    char *pNew;
+    blob_assert_safe_size((i64)newSize);
+    pNew = fossil_malloc( newSize );
+    if( pBlob->nUsed>newSize ) pBlob->nUsed = newSize;
+    memcpy(pNew, pBlob->aData, pBlob->nUsed);
+    pBlob->aData = pNew;
+    pBlob->xRealloc = blobReallocMalloc;
+    pBlob->nAlloc = newSize;
+  }
 }
 
 /*
@@ -84,30 +103,42 @@ char *blob_materialize(Blob *pBlob){
 }
 
 /*
-** Append text or data to the end of a blob.
+** Append text or data to the end of a blob.  Or, if pBlob==NULL, send
+** the text to standard output in terminal mode, or to standard CGI output
+** in CGI mode.
 **
-** The blob_append_full() routine is a complete implementation.
-** The blob_append() routine only works for cases where nData>0 and
-** no resizing is required, and falls back to blob_append_full() if
-** either condition is not met, but runs faster in the common case
-** where all conditions are met.  The use of blob_append() is
-** recommended, unless it is known in advance that nData<0.
+** If nData<0 then output all of aData up to the first 0x00 byte.
+**
+** Use the blob_append() routine in all application code.  The blob_append()
+** routine is faster, but blob_append_full() handles all the corner cases.
+** The blob_append() routine automatically calls blob_append_full() if
+** necessary.
 */
-void blob_append_full(Blob *pBlob, const char *aData, int nData){
+static void blob_append_full(Blob *pBlob, const char *aData, int nData){
   sqlite3_int64 nNew;
-  assert( aData!=0 || nData==0 );
-  blob_is_init(pBlob);
+  /* assert( aData!=0 || nData==0 ); // omitted for speed */
+  /* blob_is_init(pBlob); // omitted for speed */
   if( nData<0 ) nData = strlen(aData);
   if( nData==0 ) return;
+  if( pBlob==0 ){
+#if 0 /* libfsl */
+    if( g.cgiOutput ){
+      pBlob = cgi_output_blob();
+    }else{
+#endif /* libfsl */
+      fossil_puts(aData, 0, nData);
+      return;
+#if 0 /* libfsl */
+    }
+#endif
+  }
   nNew = pBlob->nUsed;
   nNew += nData;
   if( nNew >= pBlob->nAlloc ){
     nNew += pBlob->nAlloc;
     nNew += 100;
-    if( nNew>=0x7fff0000 ){
-      blob_panic();
-    }
-    pBlob->xRealloc(pBlob, (int)nNew);
+    blob_assert_safe_size(nNew);
+    pBlob->xRealloc(pBlob, (unsigned)nNew);
     if( pBlob->nUsed + nData >= pBlob->nAlloc ){
       blob_panic();
     }
@@ -118,20 +149,21 @@ void blob_append_full(Blob *pBlob, const char *aData, int nData){
 }
 
 /*
-** Append text or data to the end of a blob.
+** Append text or data to the end of a blob.  Or, if pBlob==NULL, send
+** the text to standard output in terminal mode, or to standard CGI output
+** in CGI mode.
 **
-** The blob_append_full() routine is a complete implementation.
-** The blob_append() routine only works for cases where nData>0 and
-** no resizing is required, and falls back to blob_append_full() if
-** either condition is not met, but runs faster in the common case
-** where all conditions are met.  The use of blob_append() is
-** recommended, unless it is known in advance that nData<0.
+** If nData<0 then output all of aData up to the first 0x00 byte.
+**
+** Use the blob_append() routine in all application code.  The blob_append()
+** routine is faster, but blob_append_full() handles all the corner cases.
+** The blob_append() routine automatically calls blob_append_full() if
+** necessary.
 */
 void blob_append(Blob *pBlob, const char *aData, int nData){
   sqlite3_int64 nUsed;
-  assert( aData!=0 || nData==0 );
-  /* blob_is_init(pBlob); // omitted for speed */
-  if( nData<=0 || pBlob->nUsed + nData >= pBlob->nAlloc ){
+  /* assert( aData!=0 || nData==0 ); // omitted for speed */
+  if( nData<=0 || pBlob==0 || pBlob->nUsed + nData >= pBlob->nAlloc ){
     blob_append_full(pBlob, aData, nData);
     return;
   }
@@ -142,10 +174,11 @@ void blob_append(Blob *pBlob, const char *aData, int nData){
 }
 
 /*
-** Append a single character to the blob
+** Append a single character to the blob.  If pBlob is zero then the
+** character is written directly to stdout.
 */
 void blob_append_char(Blob *pBlob, char c){
-  if( pBlob->nUsed+1 >= pBlob->nAlloc ){
+  if( pBlob==0 || pBlob->nUsed+1 >= pBlob->nAlloc ){
     blob_append_full(pBlob, &c, 1);
   }else{
     pBlob->aData[pBlob->nUsed++] = c;
@@ -169,8 +202,10 @@ void blobReallocMalloc(Blob *pBlob, unsigned int newSize){
     pBlob->nUsed = 0;
     pBlob->iCursor = 0;
     pBlob->blobFlags = 0;
-  }else if( newSize>pBlob->nAlloc || newSize<pBlob->nAlloc-4000 ){
-    char *pNew = fossil_realloc(pBlob->aData, newSize);
+  }else if( newSize>pBlob->nAlloc || newSize+4000<pBlob->nAlloc ){
+    char *pNew;
+    blob_assert_safe_size((i64)newSize);
+    pNew = fossil_realloc(pBlob->aData, newSize);
     pBlob->aData = pNew;
     pBlob->nAlloc = newSize;
     if( pBlob->nUsed>pBlob->nAlloc ){
@@ -228,13 +263,14 @@ void blob_zero(Blob *pBlob){
 }
 
 /*
-** Do printf-style string rendering and append the results to a blob.
+** Do printf-style string rendering and append the results to a blob.  Or
+** if pBlob==0, do printf-style string rendering directly to stdout.
 **
 ** The blob_appendf() version sets the BLOBFLAG_NotSQL bit in Blob.blobFlags
 ** whereas blob_append_sql() does not.
 */
 void blob_vappendf(Blob *pBlob, const char *zFormat, va_list ap){
-  if( pBlob ) vxprintf(pBlob, zFormat, ap);
+  vxprintf(pBlob, zFormat, ap);
 }
 
 /*
@@ -264,18 +300,17 @@ void blob_init(Blob *pBlob, const char *zData, int size){
 }
 
 /*
-** Do printf-style string rendering and append the results to a blob.
+** Do printf-style string rendering and append the results to a blob.  Or
+** if pBlob==0, do printf-style string rendering directly to stdout.
 **
 ** The blob_appendf() version sets the BLOBFLAG_NotSQL bit in Blob.blobFlags
 ** whereas blob_append_sql() does not.
 */
 void blob_append_sql(Blob *pBlob, const char *zFormat, ...){
-  if( pBlob ){
-    va_list ap;
-    va_start(ap, zFormat);
-    vxprintf(pBlob, zFormat, ap);
-    va_end(ap);
-  }
+  va_list ap;
+  va_start(ap, zFormat);
+  vxprintf(pBlob, zFormat, ap);
+  va_end(ap);
 }
 
 /*
@@ -286,7 +321,12 @@ void blob_append_sql(Blob *pBlob, const char *zFormat, ...){
 char *blob_sql_text(Blob *p){
   blob_is_init(p);
   if( (p->blobFlags & BLOBFLAG_NotSQL) ){
+#if 0 /* libfsl */
     fossil_panic("use of blob_appendf() to construct SQL text");
+#else
+    printf("use of blob_appendf() to construct SQL text\n");
+    exit (1);
+#endif
   }
   return blob_str(p);
 }

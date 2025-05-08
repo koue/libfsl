@@ -1,5 +1,5 @@
 /*
-** Copyright (c) 2017-2021 Nikola Kolev <koue@chaosophia.net>
+** Copyright (c) 2017-2025 Nikola Kolev <koue@chaosophia.net>
 ** Copyright (c) 2006 D. Richard Hipp
 **
 ** This program is free software; you can redistribute it and/or
@@ -30,11 +30,13 @@
 #include <time.h>
 
 typedef struct Blob Blob;
+typedef unsigned long long int u64;
 
 /*
 ** PRINTF
 */
 
+void fossil_puts(const char *z, int toStdErr, int n);
 int vxprintf(Blob *pBlob, const char *fmt, va_list ap);
 char *mprintf(const char *zFormat, ...);
 char *vmprintf(const char *zFormat, va_list ap);
@@ -93,7 +95,6 @@ extern const Blob empty_blob;
 
 char *blob_str(Blob *p);
 char *blob_materialize(Blob *pBlob);
-void blob_append_full(Blob *pBlob, const char *aData, int nData);
 void blob_append(Blob *pBlob, const char *aData, int nData);
 void blob_append_char(Blob *pBlob, char c);
 void blobReallocMalloc(Blob *pBlob, unsigned int newSize);
@@ -109,11 +110,12 @@ char *blob_sql_text(Blob *p);
 /*
 ** UTIL
 */
-void fossil_panic(const char *c);
+char *fossil_strndup(const char *zOrig, ssize_t len);
+char *fossil_strdup(const char *zOrig);
+char *fossil_strdup_nn(const char *zOrig);
 void *fossil_malloc(size_t n);
 void fossil_free(void *p);
 void *fossil_realloc(void *p, size_t n);
-int fossil_isspace(char c);
 int fossil_all_whitespace(const char *z);
 
 #endif
